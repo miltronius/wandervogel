@@ -36,8 +36,48 @@ export interface Hike {
   trailhead: { name: string; lat: number; lng: number };
   transport: { station: string; note: string };
   pois: Poi[];
-  /** approx waypoints [lat, lng] */
+  /** trail-snapped waypoints [lat, lng] (real OSM geometry via ORS where routeable) */
   route: [number, number][];
+  /** elevation profile along `route`, present once enriched via scripts/enrich-hikes.mjs */
+  elevation?: ElevationPoint[];
+  /** shown when part of the route could not be matched to a mapped trail (e.g. off-path scrambling) */
+  routeNotice?: string;
+}
+
+export interface LatLng {
+  lat: number;
+  lng: number;
+}
+
+export interface PlannerWaypoint extends LatLng {
+  id: string;
+  label?: string;
+}
+
+export interface ElevationPoint {
+  distanceM: number;
+  elevationM: number;
+  lat: number;
+  lng: number;
+}
+
+export interface RouteStats {
+  distanceM: number;
+  ascentM: number;
+  descentM: number;
+  durationEstimateMin: number;
+}
+
+export interface PlannedHike {
+  id: string;
+  name: string;
+  plannedDate: string | null;
+  notes?: string;
+  waypoints: PlannerWaypoint[];
+  geometry: [number, number][];
+  stats: RouteStats;
+  elevationProfile: ElevationPoint[];
+  createdAt: string;
 }
 
 export type RuheFilter = "all" | "quiet";

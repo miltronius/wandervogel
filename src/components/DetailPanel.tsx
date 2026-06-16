@@ -2,6 +2,7 @@ import type { Hike } from "../types";
 import { POI_CFG, RUHE } from "../data/hikes";
 import { gmaps, swisstopoUrl } from "../lib/geo";
 import RuheGauge from "./RuheGauge";
+import ElevationChart from "./ElevationChart";
 
 interface DetailPanelProps {
   hike: Hike;
@@ -44,6 +45,18 @@ export default function DetailPanel({ hike, onBack, onPoiClick }: DetailPanelPro
         </div>
 
         <p className="mb-[18px] text-[13.5px] leading-[1.6] text-[#d6ddcf]">{hike.summary}</p>
+
+        {hike.elevation && (
+          <Section title="Höhenprofil">
+            <ElevationChart points={hike.elevation} color="#FFC300" onHoverPoint={() => {}} />
+          </Section>
+        )}
+
+        {hike.routeNotice && (
+          <div className="mb-[18px] rounded-[10px] border border-marker/40 bg-marker/10 p-[11px_13px] text-[12px] leading-[1.5] text-marker">
+            ⚠ {hike.routeNotice}
+          </div>
+        )}
 
         <Section title="Markante Stellen & POIs">
           {hike.pois.map((p) => {

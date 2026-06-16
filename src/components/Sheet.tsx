@@ -1,7 +1,11 @@
 import { useState } from "react";
+import type { ComponentProps } from "react";
 import type { DiffFilter, DurFilter, Filters, Hike, RuheFilter } from "../types";
 import HikeCard from "./HikeCard";
 import DetailPanel from "./DetailPanel";
+import PlannerPanel from "./PlannerPanel";
+
+type Tab = "discover" | "plan";
 
 interface SheetProps {
   filteredHikes: Hike[];
@@ -12,6 +16,9 @@ interface SheetProps {
   onBack: () => void;
   onHoverChange: (id: string, hovering: boolean) => void;
   onPoiClick: (lat: number, lng: number) => void;
+  activeTab: Tab;
+  onTabChange: (tab: Tab) => void;
+  planner: ComponentProps<typeof PlannerPanel>;
 }
 
 function Chip({ on, meadow, onClick, children }: { on: boolean; meadow?: boolean; onClick: () => void; children: React.ReactNode }) {
@@ -34,6 +41,9 @@ export default function Sheet({
   onBack,
   onHoverChange,
   onPoiClick,
+  activeTab,
+  onTabChange,
+  planner,
 }: SheetProps) {
   const [mobileUp, setMobileUp] = useState(false);
 
@@ -78,6 +88,19 @@ export default function Sheet({
         </div>
       </div>
 
+      <div className="relative z-[1] flex border-b border-line">
+        <TabButton active={activeTab === "discover"} onClick={() => onTabChange("discover")}>
+          Entdecken
+        </TabButton>
+        <TabButton active={activeTab === "plan"} onClick={() => onTabChange("plan")}>
+          Planen
+        </TabButton>
+      </div>
+
+      {activeTab === "plan" ? (
+        <PlannerPanel {...planner} />
+      ) : (
+        <>
       <div className="relative z-[1] border-b border-line p-[14px_20px]">
         <FilterRow label="Ruhe — wie einsam darf's sein?">
           <Chip meadow on={filters.ruhe === "all"} onClick={() => onFiltersChange({ ...filters, ruhe: "all" as RuheFilter })}>Alle</Chip>
@@ -128,7 +151,22 @@ export default function Sheet({
           onPoiClick={onPoiClick}
         />
       )}
+        </>
+      )}
     </aside>
+  );
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      className={`flex-1 p-[11px_0] text-center font-mono text-[11px] uppercase tracking-[.12em] transition-colors duration-150 ${
+        active ? "border-b-2 border-marker text-marker" : "border-b-2 border-transparent text-muted hover:text-text"
+      }`}
+      onClick={onClick}
+    >
+      {children}
+    </button>
   );
 }
 

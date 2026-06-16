@@ -1,18 +1,30 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
-import type { BaseLayerKey, Hike, OverlayKey } from "../types";
+import type { BaseLayerKey, ElevationPoint, Hike, LatLng, OverlayKey, PlannerWaypoint } from "../types";
 import { POI_CFG } from "../data/hikes";
+import { nearestSegmentInsertIndex } from "../lib/routing";
+
+type Mode = "discover" | "plan";
 
 interface MapViewProps {
+  mode: Mode;
   filteredHikes: Hike[];
   selectedHike: Hike | null;
   hoveredId: string | null;
   focusPoi: { lat: number; lng: number; nonce: number } | null;
   onSelectHike: (id: string) => void;
+  waypoints: PlannerWaypoint[];
+  routeGeometry: [number, number][];
+  hoverElevationPoint: ElevationPoint | null;
+  onAddWaypoint: (latlng: LatLng) => void;
+  onInsertWaypoint: (index: number, latlng: LatLng) => void;
+  onMoveWaypoint: (id: string, latlng: LatLng) => void;
+  onRemoveWaypoint: (id: string) => void;
 }
 
 const DEFAULT_CENTER: L.LatLngTuple = [46.8, 8.2];
 const DEFAULT_ZOOM = 8;
+const INSERT_TOLERANCE_PX = 16;
 
 const ST = "https://wmts.geo.admin.ch/1.0.0/";
 const ATTR = '© <a href="https://www.swisstopo.admin.ch">swisstopo</a> · Wege: swisstopo / SchweizMobil, ASTRA';
@@ -52,8 +64,40 @@ function poiIcon(t: keyof typeof POI_CFG) {
     iconAnchor: [12, 24],
   });
 }
+function waypointIcon(label: string) {
+  return L.divIcon({
+    className: "",
+    html: `<div class="pin start"><span>${label}</span></div>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 30],
+  });
+}
 
-export default function MapView({ filteredHikes, selectedHike, hoveredId, focusPoi, onSelectHike }: MapViewProps) {
+function pixelPointToSegmentDistance(p: L.Point, a: L.Point, b: L.Point): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lengthSq = dx * dx + dy * dy;
+  const t = lengthSq === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSq));
+  const projX = a.x + t * dx;
+  const projY = a.y + t * dy;
+  return Math.hypot(p.x - projX, p.y - projY);
+}
+
+export default function MapView({
+  mode,
+  filteredHikes,
+  selectedHike,
+  hoveredId,
+  focusPoi,
+  onSelectHike,
+  waypoints,
+  routeGeometry,
+  hoverElevationPoint,
+  onAddWaypoint,
+  onInsertWaypoint,
+  onMoveWaypoint,
+  onRemoveWaypoint,
+}: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const basesRef = useRef<Record<BaseLayerKey, L.TileLayer> | null>(null);
@@ -61,6 +105,9 @@ export default function MapView({ filteredHikes, selectedHike, hoveredId, focusP
   const startMarkersRef = useRef<{ id: string; marker: L.Marker }[]>([]);
   const routeLayersRef = useRef<L.Polyline[]>([]);
   const poiMarkersRef = useRef<{ lat: number; lng: number; marker: L.Marker }[]>([]);
+  const waypointMarkersRef = useRef<L.Marker[]>([]);
+  const planRouteLayersRef = useRef<L.Polyline[]>([]);
+  const hoverMarkerRef = useRef<L.CircleMarker | null>(null);
 
   const [activeBase, setActiveBase] = useState<BaseLayerKey>("map");
   const [activeOvl, setActiveOvl] = useState<Set<OverlayKey>>(new Set(["wander"]));
@@ -134,12 +181,13 @@ export default function MapView({ filteredHikes, selectedHike, hoveredId, focusP
     });
   }, [activeOvl]);
 
-  // start markers for currently filtered hikes
+  // start markers for currently filtered hikes (discover mode only)
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     startMarkersRef.current.forEach((m) => map.removeLayer(m.marker));
     startMarkersRef.current = [];
+    if (mode !== "discover") return;
 
     filteredHikes.forEach((h) => {
       const marker = L.marker([h.trailhead.lat, h.trailhead.lng], { icon: startIcon() }).addTo(map);
@@ -147,7 +195,7 @@ export default function MapView({ filteredHikes, selectedHike, hoveredId, focusP
       marker.on("click", () => onSelectHike(h.id));
       startMarkersRef.current.push({ id: h.id, marker });
     });
-  }, [filteredHikes, onSelectHike]);
+  }, [mode, filteredHikes, onSelectHike]);
 
   // hover highlight on start markers
   useEffect(() => {
@@ -160,7 +208,7 @@ export default function MapView({ filteredHikes, selectedHike, hoveredId, focusP
     });
   }, [hoveredId]);
 
-  // route + POI markers for selected hike
+  // route + POI markers for selected hike (discover mode only)
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -169,6 +217,8 @@ export default function MapView({ filteredHikes, selectedHike, hoveredId, focusP
     routeLayersRef.current = [];
     poiMarkersRef.current.forEach((m) => map.removeLayer(m.marker));
     poiMarkersRef.current = [];
+
+    if (mode !== "discover") return;
 
     if (!selectedHike) {
       map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
@@ -194,7 +244,7 @@ export default function MapView({ filteredHikes, selectedHike, hoveredId, focusP
     });
 
     map.flyToBounds(line.getBounds().pad(0.35), { duration: 0.9 });
-  }, [selectedHike]);
+  }, [mode, selectedHike]);
 
   // focus a single POI (from detail-panel list click)
   useEffect(() => {
@@ -207,6 +257,103 @@ export default function MapView({ filteredHikes, selectedHike, hoveredId, focusP
     found?.marker.openPopup();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusPoi?.nonce]);
+
+  // planner: map click adds/inserts a waypoint
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || mode !== "plan") return;
+
+    const handleClick = (e: L.LeafletMouseEvent) => {
+      if (waypoints.length >= 2) {
+        const clickPx = map.latLngToContainerPoint(e.latlng);
+        let nearest = Infinity;
+        for (let i = 0; i < waypoints.length - 1; i++) {
+          const a = map.latLngToContainerPoint(L.latLng(waypoints[i].lat, waypoints[i].lng));
+          const b = map.latLngToContainerPoint(L.latLng(waypoints[i + 1].lat, waypoints[i + 1].lng));
+          nearest = Math.min(nearest, pixelPointToSegmentDistance(clickPx, a, b));
+        }
+        if (nearest < INSERT_TOLERANCE_PX) {
+          const index = nearestSegmentInsertIndex(waypoints, { lat: e.latlng.lat, lng: e.latlng.lng });
+          onInsertWaypoint(index, { lat: e.latlng.lat, lng: e.latlng.lng });
+          return;
+        }
+      }
+      onAddWaypoint({ lat: e.latlng.lat, lng: e.latlng.lng });
+    };
+
+    map.on("click", handleClick);
+    return () => {
+      map.off("click", handleClick);
+    };
+  }, [mode, waypoints, onAddWaypoint, onInsertWaypoint]);
+
+  // planner: render waypoint markers
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    waypointMarkersRef.current.forEach((m) => map.removeLayer(m));
+    waypointMarkersRef.current = [];
+    if (mode !== "plan") return;
+
+    waypoints.forEach((wp, i) => {
+      const label = i === 0 ? "S" : i === waypoints.length - 1 ? "Z" : String(i);
+      const marker = L.marker([wp.lat, wp.lng], { icon: waypointIcon(label), draggable: true }).addTo(map);
+      marker.on("dragend", () => {
+        const ll = marker.getLatLng();
+        onMoveWaypoint(wp.id, { lat: ll.lat, lng: ll.lng });
+      });
+      marker.bindPopup(
+        `<div style="font-size:12px"><b>${i === 0 ? "Start" : i === waypoints.length - 1 ? "Ziel" : `Via ${i}`}</b><br/><button class="wp-remove-btn" style="margin-top:6px;cursor:pointer">Entfernen</button></div>`,
+      );
+      marker.on("popupopen", (e) => {
+        const btn = e.popup.getElement()?.querySelector(".wp-remove-btn");
+        btn?.addEventListener("click", () => {
+          onRemoveWaypoint(wp.id);
+          map.closePopup();
+        });
+      });
+      waypointMarkersRef.current.push(marker);
+    });
+  }, [mode, waypoints, onMoveWaypoint, onRemoveWaypoint]);
+
+  // planner: render ORS-snapped route line
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    planRouteLayersRef.current.forEach((l) => map.removeLayer(l));
+    planRouteLayersRef.current = [];
+    if (mode !== "plan" || routeGeometry.length < 2) return;
+
+    const outline = L.polyline(routeGeometry, { color: "#1a1500", weight: 7, opacity: 0.35 }).addTo(map);
+    outline.bringToBack();
+    const line = L.polyline(routeGeometry, { color: "#FFC300", weight: 4, opacity: 0.95, lineJoin: "round" }).addTo(map);
+    planRouteLayersRef.current = [outline, line];
+  }, [mode, routeGeometry]);
+
+  // planner: sync elevation-chart hover with a map marker
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (!hoverElevationPoint) {
+      if (hoverMarkerRef.current) {
+        map.removeLayer(hoverMarkerRef.current);
+        hoverMarkerRef.current = null;
+      }
+      return;
+    }
+    if (!hoverMarkerRef.current) {
+      hoverMarkerRef.current = L.circleMarker([hoverElevationPoint.lat, hoverElevationPoint.lng], {
+        radius: 7,
+        color: "#fff",
+        weight: 3,
+        fillColor: "#FFC300",
+        fillOpacity: 1,
+        interactive: false,
+      }).addTo(map);
+    } else {
+      hoverMarkerRef.current.setLatLng([hoverElevationPoint.lat, hoverElevationPoint.lng]);
+    }
+  }, [hoverElevationPoint]);
 
   return (
     <div className="relative min-w-0 flex-1">
@@ -252,6 +399,14 @@ export default function MapView({ filteredHikes, selectedHike, hoveredId, focusP
           })}
         </div>
       </div>
+
+      {mode === "plan" && (
+        <div className="absolute left-[14px] top-[14px] z-[600] rounded-lg border border-line bg-[rgba(14,20,17,.84)] px-3 py-[8px] font-mono text-[11px] tracking-wide text-muted backdrop-blur-sm">
+          {waypoints.length === 0
+            ? "Klick auf die Karte: Startpunkt setzen"
+            : "Weiter klicken zum Verlängern · auf die Linie klicken für Zwischenpunkt"}
+        </div>
+      )}
 
       <div className="absolute bottom-[14px] left-1/2 z-[600] -translate-x-1/2 whitespace-nowrap rounded-lg border border-line bg-[rgba(14,20,17,.84)] px-3 py-[5px] font-mono text-[11px] tracking-wide text-muted backdrop-blur-sm max-md:bottom-auto max-md:top-[14px]">
         SCHWEIZ · <b className="font-bold text-marker">{readout.coord}</b> · <span>Zoom {readout.zoom}</span>
