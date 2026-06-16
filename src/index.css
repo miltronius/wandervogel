@@ -1,0 +1,167 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0e1411;
+  --color-panel: #151c17;
+  --color-panel-2: #1c241d;
+  --color-line: #2c352c;
+  --color-line-soft: #222b22;
+  --color-text: #ecefe6;
+  --color-muted: #94a38c;
+  --color-muted-2: #6c7a66;
+  --color-marker: #ffc300;
+  --color-blaze: #e2231a;
+  --color-glacier: #9fc7d6;
+  --color-meadow: #86b23f;
+
+  --font-display: "Space Grotesk", sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "Space Mono", monospace;
+
+  --shadow-sheet: 0 18px 50px -22px rgba(0, 0, 0, 0.8);
+}
+
+:root {
+  --shadow: 0 18px 50px -22px rgba(0, 0, 0, 0.8);
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: #0e1411;
+  color: #ecefe6;
+  font-family: "Inter", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-thumb {
+  background: #2c352c;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#app {
+  display: flex;
+  height: 100%;
+  width: 100%;
+}
+@media (max-width: 760px) {
+  #app {
+    flex-direction: column;
+  }
+}
+
+.leaflet-container {
+  background: #0b0f0c;
+  font-family: "Inter", sans-serif;
+}
+.leaflet-control-attribution {
+  background: rgba(14, 20, 17, 0.82) !important;
+  color: #94a38c !important;
+  font-size: 10px;
+}
+.leaflet-control-attribution a {
+  color: #9fc7d6 !important;
+}
+.leaflet-bar a {
+  background: #151c17 !important;
+  color: #ecefe6 !important;
+  border-color: #2c352c !important;
+}
+.leaflet-bar a:hover {
+  background: #1c241d !important;
+}
+
+/* map pin markers (rendered via L.divIcon, outside React's styling reach) */
+.pin {
+  display: grid;
+  place-items: center;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  border: 2px solid;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
+  transition: transform 0.15s;
+}
+.pin > span {
+  transform: rotate(45deg);
+  font-size: 13px;
+  line-height: 1;
+}
+.pin.start {
+  width: 30px;
+  height: 30px;
+  background: #ffc300;
+  border-color: #fff8e0;
+}
+.pin.start > span {
+  font-size: 15px;
+}
+.pin.poi {
+  width: 24px;
+  height: 24px;
+  background: #151c17;
+  border-color: #9fc7d6;
+}
+
+.leaflet-popup-content-wrapper {
+  background: #151c17;
+  color: #ecefe6;
+  border: 1px solid #2c352c;
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+.leaflet-popup-tip {
+  background: #151c17;
+  border: 1px solid #2c352c;
+}
+.leaflet-popup-content {
+  margin: 11px 14px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.leaflet-popup-content b {
+  font-family: "Space Grotesk", sans-serif;
+}
+.pop-type {
+  font-family: "Space Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #ffc300;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.hike-card {
+  animation: rise 0.4s backwards;
+}
