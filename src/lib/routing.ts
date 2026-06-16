@@ -1,7 +1,9 @@
 import type { ElevationPoint, LatLng } from "../types";
 
-const ORS_API_KEY = import.meta.env.VITE_ORS_API_KEY as string | undefined;
-const ORS_URL = "https://api.openrouteservice.org/v2/directions/foot-hiking/geojson";
+// Same-origin proxy (api/route.ts on Vercel, mirrored by a Vite dev-server
+// middleware locally) — keeps the ORS key server-side only, never shipped
+// to the browser bundle.
+const PROXY_URL = "/api/route";
 
 export class RoutingError extends Error {
   constructor(
@@ -41,20 +43,12 @@ export async function fetchHikingRoute(waypoints: LatLng[]): Promise<RoutingResu
   if (waypoints.length < 2) {
     throw new RoutingError("Mindestens zwei Wegpunkte nötig.");
   }
-  if (!ORS_API_KEY) {
-    throw new RoutingError(
-      "Kein OpenRouteService-API-Key konfiguriert. Bitte VITE_ORS_API_KEY in .env.local setzen (siehe .env.example).",
-    );
-  }
 
   let res: Response;
   try {
-    res = await fetch(ORS_URL, {
+    res = await fetch(PROXY_URL, {
       method: "POST",
-      headers: {
-        Authorization: ORS_API_KEY,
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         coordinates: waypoints.map((w) => [w.lng, w.lat]),
         elevation: true,

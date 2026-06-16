@@ -20,7 +20,9 @@
       "Bash(node scripts/merge-enrichment.mjs)",
       "Bash(cd d:/dev/wandervogel && diff /tmp/hikes.ts.bak src/data/hikes.ts | head -60)",
       "Read(//tmp/**)",
-      "Bash(cd d:/dev/wandervogel && diff /tmp/hikes.ts.bak src/data/hikes.ts | grep -E \"^[0-9]+[ac]\" )"
+      "Bash(cd d:/dev/wandervogel && diff /tmp/hikes.ts.bak src/data/hikes.ts | grep -E \"^[0-9]+[ac]\" )",
+      "Bash(curl -s -X POST http://localhost:5173/api/route -H \"Content-Type: application/json\" -d '{\"coordinates\":[[8.2,46.8],[8.21,46.81]],\"elevation\":true}')",
+      "Bash(node .tmp-proxy-test.mjs)"
     ]
   }
 }

@@ -19,16 +19,24 @@ This requires a free API key:
 2. Copy `.env.example` to `.env.local` and paste the key:
 
    ```sh
-   VITE_ORS_API_KEY=your-key-here
+   ORS_API_KEY=your-key-here
    ```
 
 3. Restart `npm run dev`.
 
-**Note:** this is a static frontend with no backend, so the key ships in the
-browser bundle and is visible in network requests. That's fine for personal
-use on the free tier, but don't treat it as a secret if you deploy this
-publicly — anyone with the URL could spend your daily quota. A small
-server-side proxy would be the next step to harden this.
+The key is deliberately **not** prefixed with `VITE_`, so Vite never inlines
+it into the browser bundle. The browser only ever talks to this app's own
+`/api/route` endpoint:
+
+- In production (Vercel), `api/route.ts` is a serverless function that reads
+  `ORS_API_KEY` from Vercel's environment variables (Project → Settings →
+  Environment Variables — same key, same name) and forwards the request to
+  ORS server-side.
+- In local dev, a Vite middleware (`vite.config.ts`) does the same thing so
+  `npm run dev` works without the Vercel CLI.
+
+Both share the same logic (`api/_lib/orsProxy.ts`), so there's one place to
+change if the routing engine or profile ever changes.
 
 ### Enriching the curated hikes with real trail data
 
