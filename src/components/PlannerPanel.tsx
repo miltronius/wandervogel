@@ -1,5 +1,10 @@
 import { useState } from "react";
-import type { ElevationPoint, PlannedHike, PlannerWaypoint, RouteStats } from "../types";
+import type {
+  ElevationPoint,
+  PlannedHike,
+  PlannerWaypoint,
+  RouteStats,
+} from "../types";
 import ElevationChart from "./ElevationChart";
 import { buildGpx, downloadGpx } from "../lib/gpx";
 
@@ -78,7 +83,11 @@ export default function PlannerPanel({
   const handleExportGpx = () => {
     if (geometry.length === 0) return;
     const points = elevationProfile.length
-      ? elevationProfile.map((p) => ({ lat: p.lat, lng: p.lng, ele: p.elevationM }))
+      ? elevationProfile.map((p) => ({
+          lat: p.lat,
+          lng: p.lng,
+          ele: p.elevationM,
+        }))
       : geometry.map(([lat, lng]) => ({ lat, lng }));
     const gpx = buildGpx(name.trim() || "Wandervogel-Route", points);
     downloadGpx(name.trim() || "wandervogel-route", gpx);
@@ -91,9 +100,10 @@ export default function PlannerPanel({
           Eigene Route bauen
         </div>
         <p className="text-[12px] leading-[1.5] text-muted">
-          Klicke auf die Karte: erster Klick setzt den Start, jeder weitere Klick verlängert die Route.
-          Klicke direkt auf die gezeichnete Linie, um einen Zwischenpunkt einzufügen. Marker lassen sich
-          verschieben oder per Klick entfernen.
+          Klicke auf die Karte: erster Klick setzt den Start, jeder weitere
+          Klick verlängert die Route. Klicke direkt auf die gezeichnete Linie,
+          um einen Zwischenpunkt einzufügen. Marker lassen sich verschieben oder
+          per Klick entfernen.
         </p>
       </div>
 
@@ -101,13 +111,18 @@ export default function PlannerPanel({
         <div className="mb-2 flex items-center justify-between font-mono text-[9.5px] uppercase tracking-[.18em] text-muted-2">
           <span>Wegpunkte ({waypoints.length})</span>
           {waypoints.length > 0 && (
-            <button className="text-muted hover:text-marker" onClick={onClearWaypoints}>
+            <button
+              className="text-muted hover:text-marker"
+              onClick={onClearWaypoints}
+            >
               Alle löschen
             </button>
           )}
         </div>
         {waypoints.length === 0 ? (
-          <div className="text-[12px] text-muted-2">Noch keine Wegpunkte gesetzt.</div>
+          <div className="text-[12px] text-muted-2">
+            Noch keine Wegpunkte gesetzt.
+          </div>
         ) : (
           <div className="flex flex-col gap-1">
             {waypoints.map((wp, i) => (
@@ -116,10 +131,17 @@ export default function PlannerPanel({
                 className="flex items-center justify-between rounded-md border border-line bg-panel-2 px-[10px] py-[6px] text-[12px]"
               >
                 <span>
-                  {i === 0 ? "Start" : i === waypoints.length - 1 ? "Ziel" : `Via ${i}`} ·{" "}
-                  {wp.lat.toFixed(4)}, {wp.lng.toFixed(4)}
+                  {i === 0
+                    ? "Start"
+                    : i === waypoints.length - 1
+                      ? "Ziel"
+                      : `Via ${i}`}{" "}
+                  · {wp.lat.toFixed(4)}, {wp.lng.toFixed(4)}
                 </span>
-                <button className="text-muted-2 hover:text-blaze" onClick={() => onRemoveWaypoint(wp.id)}>
+                <button
+                  className="text-muted-2 hover:text-blaze"
+                  onClick={() => onRemoveWaypoint(wp.id)}
+                >
                   ✕
                 </button>
               </div>
@@ -129,23 +151,43 @@ export default function PlannerPanel({
       </div>
 
       {loading && (
-        <div className="border-b border-line p-[14px_20px] text-[12px] text-muted">Route wird berechnet…</div>
+        <div className="border-b border-line p-[14px_20px] text-[12px] text-muted">
+          Route wird berechnet…
+        </div>
       )}
       {error && (
-        <div className="border-b border-line p-[14px_20px] text-[12px] text-[#ff7b72]">{error}</div>
+        <div className="border-b border-line p-[14px_20px] text-[12px] text-[#ff7b72]">
+          {error}
+        </div>
       )}
 
       {stats && (
         <div className="border-b border-line p-[14px_20px]">
           <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-line bg-line">
             <Stat k="Distanz" v={formatKm(stats.distanceM)} unit="km" />
-            <Stat k="Dauer (Schätzung)" v={formatMin(stats.durationEstimateMin)} unit="" />
-            <Stat k="Aufstieg" v={Math.round(stats.ascentM).toString()} unit="m ↗" />
-            <Stat k="Abstieg" v={Math.round(stats.descentM).toString()} unit="m ↘" />
+            <Stat
+              k="Dauer (Schätzung)"
+              v={formatMin(stats.durationEstimateMin)}
+              unit=""
+            />
+            <Stat
+              k="Aufstieg"
+              v={Math.round(stats.ascentM).toString()}
+              unit="m ↗"
+            />
+            <Stat
+              k="Abstieg"
+              v={Math.round(stats.descentM).toString()}
+              unit="m ↘"
+            />
           </div>
 
           <div className="mt-3">
-            <ElevationChart points={elevationProfile} color="#FFC300" onHoverPoint={onHoverElevationPoint} />
+            <ElevationChart
+              points={elevationProfile}
+              color="#22D3EE"
+              onHoverPoint={onHoverElevationPoint}
+            />
           </div>
         </div>
       )}
@@ -192,19 +234,35 @@ export default function PlannerPanel({
       )}
 
       <div className="p-[14px_20px]">
-        <div className="mb-2 font-mono text-[9.5px] uppercase tracking-[.18em] text-muted-2">Meine Pläne</div>
+        <div className="mb-2 font-mono text-[9.5px] uppercase tracking-[.18em] text-muted-2">
+          Meine Pläne
+        </div>
         {savedPlans.length === 0 ? (
-          <div className="text-[12px] text-muted-2">Noch keine gespeicherten Touren.</div>
+          <div className="text-[12px] text-muted-2">
+            Noch keine gespeicherten Touren.
+          </div>
         ) : (
           <div className="flex flex-col gap-[9px]">
             {savedPlans.map((plan) => (
-              <div key={plan.id} className="rounded-[11px] border border-line bg-panel-2 p-[13px_14px]">
+              <div
+                key={plan.id}
+                className="rounded-[11px] border border-line bg-panel-2 p-[13px_14px]"
+              >
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <div className="font-display text-[14px] font-semibold">{plan.name}</div>
-                    {plan.plannedDate && <div className="text-[11px] text-muted">{plan.plannedDate}</div>}
+                    <div className="font-display text-[14px] font-semibold">
+                      {plan.name}
+                    </div>
+                    {plan.plannedDate && (
+                      <div className="text-[11px] text-muted">
+                        {plan.plannedDate}
+                      </div>
+                    )}
                   </div>
-                  <button className="text-muted-2 hover:text-blaze" onClick={() => onDeletePlan(plan.id)}>
+                  <button
+                    className="text-muted-2 hover:text-blaze"
+                    onClick={() => onDeletePlan(plan.id)}
+                  >
                     ✕
                   </button>
                 </div>
@@ -231,7 +289,9 @@ export default function PlannerPanel({
 function Stat({ k, v, unit }: { k: string; v: string; unit: string }) {
   return (
     <div className="bg-panel-2 p-[11px_12px]">
-      <div className="font-mono text-[9px] uppercase tracking-[.16em] text-muted-2">{k}</div>
+      <div className="font-mono text-[9px] uppercase tracking-[.16em] text-muted-2">
+        {k}
+      </div>
       <div className="mt-[3px] font-display text-[16px] font-semibold">
         {v} <small className="text-[11px] font-normal text-muted">{unit}</small>
       </div>

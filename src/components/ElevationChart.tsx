@@ -8,7 +8,11 @@ interface ElevationChartProps {
   onHoverPoint: (point: ElevationPoint | null) => void;
 }
 
-export default function ElevationChart({ points, color, onHoverPoint }: ElevationChartProps) {
+export default function ElevationChart({
+  points,
+  color,
+  onHoverPoint,
+}: ElevationChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
 
@@ -68,7 +72,8 @@ export default function ElevationChart({ points, color, onHoverPoint }: Elevatio
             padding: 8,
             cornerRadius: 4,
             callbacks: {
-              title: (items) => `${parseFloat(String(items[0].label)).toFixed(2)} km`,
+              title: (items) =>
+                `${parseFloat(String(items[0].label)).toFixed(2)} km`,
               label: (item) => `${Math.round(item.parsed.y ?? 0)} m`,
             },
           },
@@ -76,6 +81,9 @@ export default function ElevationChart({ points, color, onHoverPoint }: Elevatio
         scales: {
           x: {
             type: "linear",
+            min: 0,
+            max: labels[labels.length - 1],
+            offset: false,
             ticks: {
               color: "#94A38C",
               callback: (v) => `${Number(v).toFixed(1)} km`,
