@@ -3,6 +3,7 @@ import type {
   ElevationPoint,
   PlannedHike,
   PlannerWaypoint,
+  RouteOption,
   RouteStats,
 } from "../types";
 import ElevationChart from "./ElevationChart";
@@ -13,6 +14,9 @@ interface PlannerPanelProps {
   geometry: [number, number][];
   elevationProfile: ElevationPoint[];
   stats: RouteStats | null;
+  routeOptions: RouteOption[];
+  activeRouteIndex: number;
+  onSelectRouteOption: (index: number) => void;
   loading: boolean;
   error: string | null;
   onRemoveWaypoint: (id: string) => void;
@@ -35,6 +39,9 @@ function nextSaturday(): string {
 function formatKm(m: number) {
   return (m / 1000).toFixed(1);
 }
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("de-CH");
+}
 function formatMin(min: number) {
   const h = Math.floor(min / 60);
   const m = Math.round(min % 60);
@@ -46,6 +53,9 @@ export default function PlannerPanel({
   geometry,
   elevationProfile,
   stats,
+  routeOptions,
+  activeRouteIndex,
+  onSelectRouteOption,
   loading,
   error,
   onRemoveWaypoint,
@@ -91,6 +101,14 @@ export default function PlannerPanel({
       : geometry.map(([lat, lng]) => ({ lat, lng }));
     const gpx = buildGpx(name.trim() || "Wandervogel-Route", points);
     downloadGpx(name.trim() || "wandervogel-route", gpx);
+  };
+
+  const handleExportPlanGpx = (plan: PlannedHike) => {
+    const points = plan.elevationProfile.length
+      ? plan.elevationProfile.map((p) => ({ lat: p.lat, lng: p.lng, ele: p.elevationM }))
+      : plan.geometry.map(([lat, lng]) => ({ lat, lng }));
+    const gpx = buildGpx(plan.name, points);
+    downloadGpx(plan.name, gpx);
   };
 
   return (
@@ -158,6 +176,32 @@ export default function PlannerPanel({
       {error && (
         <div className="border-b border-line p-[14px_20px] text-[12px] text-[#ff7b72]">
           {error}
+        </div>
+      )}
+
+      {routeOptions.length > 1 && (
+        <div className="border-b border-line p-[14px_20px]">
+          <div className="mb-2 font-mono text-[9.5px] uppercase tracking-[.18em] text-muted-2">
+            Routenvarianten
+          </div>
+          <div className="flex flex-col gap-[6px]">
+            {routeOptions.map((opt, i) => (
+              <button
+                key={opt.profile}
+                onClick={() => onSelectRouteOption(i)}
+                className={`flex items-center justify-between rounded-md border px-[10px] py-[7px] text-left text-[12.5px] transition-colors duration-150 ${
+                  i === activeRouteIndex
+                    ? "border-marker bg-marker/10 text-text"
+                    : "border-line bg-panel-2 text-muted hover:border-muted-2"
+                }`}
+              >
+                <span className="font-medium">{opt.label}</span>
+                <span className="font-mono text-[11px]">
+                  {formatKm(opt.stats.distanceM)} km · ↗{Math.round(opt.stats.ascentM)} m
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -255,7 +299,7 @@ export default function PlannerPanel({
                     </div>
                     {plan.plannedDate && (
                       <div className="text-[11px] text-muted">
-                        {plan.plannedDate}
+                        {formatDate(plan.plannedDate)}
                       </div>
                     )}
                   </div>
@@ -271,12 +315,20 @@ export default function PlannerPanel({
                   <span>↗ {Math.round(plan.stats.ascentM)} m</span>
                   <span>{formatMin(plan.stats.durationEstimateMin)}</span>
                 </div>
-                <button
-                  className="mt-2 w-full rounded-md border border-line py-[6px] text-[11.5px] text-text hover:border-muted-2"
-                  onClick={() => onLoadPlan(plan)}
-                >
-                  Auf Karte laden
-                </button>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    className="flex-1 rounded-md border border-line py-[6px] text-[11.5px] text-text hover:border-muted-2"
+                    onClick={() => onLoadPlan(plan)}
+                  >
+                    Auf Karte laden
+                  </button>
+                  <button
+                    className="flex-1 rounded-md border border-line py-[6px] text-[11.5px] text-text hover:border-muted-2"
+                    onClick={() => handleExportPlanGpx(plan)}
+                  >
+                    GPX exportieren
+                  </button>
+                </div>
               </div>
             ))}
           </div>

@@ -68,6 +68,14 @@ export interface RouteStats {
   durationEstimateMin: number;
 }
 
+export interface RouteOption {
+  profile: "foot-hiking" | "foot-walking";
+  label: string;
+  geometry: [number, number][];
+  elevationProfile: ElevationPoint[];
+  stats: RouteStats;
+}
+
 export interface PlannedHike {
   id: string;
   name: string;

@@ -5,6 +5,8 @@ import type { ElevationPoint, LatLng } from "../types";
 // to the browser bundle.
 const PROXY_URL = "/api/route";
 
+export type RouteProfile = "foot-hiking" | "foot-walking";
+
 export class RoutingError extends Error {
   constructor(
     message: string,
@@ -35,11 +37,14 @@ function haversineM(a: LatLng, b: LatLng): number {
 }
 
 /**
- * Routes a sequence of waypoints onto real hiking trails via OpenRouteService's
- * foot-hiking profile. Throws RoutingError if the key is missing, the request
- * fails, or ORS can't find a path between the given points.
+ * Routes a sequence of waypoints onto real hiking trails via OpenRouteService.
+ * Throws RoutingError if the key is missing, the request fails, or ORS can't
+ * find a path between the given points.
  */
-export async function fetchHikingRoute(waypoints: LatLng[]): Promise<RoutingResult> {
+export async function fetchHikingRoute(
+  waypoints: LatLng[],
+  profile: RouteProfile = "foot-hiking",
+): Promise<RoutingResult> {
   if (waypoints.length < 2) {
     throw new RoutingError("Mindestens zwei Wegpunkte nötig.");
   }
@@ -50,6 +55,7 @@ export async function fetchHikingRoute(waypoints: LatLng[]): Promise<RoutingResu
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        profile,
         coordinates: waypoints.map((w) => [w.lng, w.lat]),
         elevation: true,
       }),

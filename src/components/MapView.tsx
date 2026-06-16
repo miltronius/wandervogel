@@ -22,6 +22,7 @@ interface MapViewProps {
   onSelectHike: (id: string) => void;
   waypoints: PlannerWaypoint[];
   routeGeometry: [number, number][];
+  flyToRouteSignal: number;
   hoverElevationPoint: ElevationPoint | null;
   onAddWaypoint: (latlng: LatLng) => void;
   onInsertWaypoint: (index: number, latlng: LatLng) => void;
@@ -112,6 +113,7 @@ export default function MapView({
   onSelectHike,
   waypoints,
   routeGeometry,
+  flyToRouteSignal,
   hoverElevationPoint,
   onAddWaypoint,
   onInsertWaypoint,
@@ -415,6 +417,14 @@ export default function MapView({
     }).addTo(map);
     planRouteLayersRef.current = [outline, line];
   }, [mode, routeGeometry]);
+
+  // planner: fly to route bounds on explicit signal (e.g. loading a saved plan)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || flyToRouteSignal === 0 || routeGeometry.length < 2) return;
+    map.flyToBounds(L.latLngBounds(routeGeometry).pad(0.35), { duration: 0.9 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flyToRouteSignal]);
 
   // planner: sync elevation-chart hover with a map marker
   useEffect(() => {

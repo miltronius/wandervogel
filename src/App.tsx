@@ -1,17 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { HIKES } from "./data/hikes";
 import { passesFilters } from "./lib/filters";
-import { fetchHikingRoute, RoutingError } from "./lib/routing";
+import { fetchHikingRoute, RoutingError, type RouteProfile } from "./lib/routing";
 import { estimateHikingMinutes } from "./lib/hikeEstimate";
 import { usePlannedHikes } from "./hooks/usePlannedHikes";
-import type { ElevationPoint, Filters, LatLng, PlannedHike, PlannerWaypoint, RouteStats } from "./types";
+import type { ElevationPoint, Filters, LatLng, PlannedHike, PlannerWaypoint, RouteOption } from "./types";
 import Sheet from "./components/Sheet";
 import MapView from "./components/MapView";
 
 type Tab = "discover" | "plan";
 
+const PROFILE_LABELS: Record<RouteProfile, string> = {
+  "foot-hiking": "Wanderweg",
+  "foot-walking": "Direkt",
+};
+
 function makeWaypoint(latlng: LatLng): PlannerWaypoint {
   return { id: crypto.randomUUID(), ...latlng };
+}
+
+function routeSignature(option: RouteOption): string {
+  const km = (option.stats.distanceM / 10).toFixed(0); // ~10m buckets
+  const mid = option.geometry[Math.floor(option.geometry.length / 2)] ?? [0, 0];
+  return `${km}|${mid[0].toFixed(3)},${mid[1].toFixed(3)}`;
 }
 
 export default function App() {
@@ -35,12 +46,17 @@ export default function App() {
 
   // --- planner state ---
   const [waypoints, setWaypoints] = useState<PlannerWaypoint[]>([]);
-  const [geometry, setGeometry] = useState<[number, number][]>([]);
-  const [elevationProfile, setElevationProfile] = useState<ElevationPoint[]>([]);
-  const [stats, setStats] = useState<RouteStats | null>(null);
+  const [routeOptions, setRouteOptions] = useState<RouteOption[]>([]);
+  const [activeRouteIndex, setActiveRouteIndex] = useState(0);
   const [routingLoading, setRoutingLoading] = useState(false);
   const [routingError, setRoutingError] = useState<string | null>(null);
   const [hoverElevationPoint, setHoverElevationPoint] = useState<ElevationPoint | null>(null);
+  const [flyToRouteSignal, setFlyToRouteSignal] = useState(0);
+
+  const activeRoute = routeOptions[activeRouteIndex] ?? null;
+  const geometry = activeRoute?.geometry ?? [];
+  const elevationProfile = activeRoute?.elevationProfile ?? [];
+  const stats = activeRoute?.stats ?? null;
 
   const { plans, savePlan, removePlan } = usePlannedHikes();
 
@@ -58,18 +74,16 @@ export default function App() {
   const onRemoveWaypoint = useCallback((id: string) => setWaypoints((prev) => prev.filter((wp) => wp.id !== id)), []);
   const onClearWaypoints = useCallback(() => {
     setWaypoints([]);
-    setGeometry([]);
-    setElevationProfile([]);
-    setStats(null);
+    setRouteOptions([]);
+    setActiveRouteIndex(0);
     setRoutingError(null);
   }, []);
 
   // debounced re-routing whenever the waypoint sequence changes
   useEffect(() => {
     if (waypoints.length < 2) {
-      setGeometry([]);
-      setElevationProfile([]);
-      setStats(null);
+      setRouteOptions([]);
+      setActiveRouteIndex(0);
       setRoutingError(null);
       return;
     }
@@ -77,18 +91,55 @@ export default function App() {
       setRoutingLoading(true);
       setRoutingError(null);
       try {
-        const result = await fetchHikingRoute(waypoints);
-        setGeometry(result.geometry.map((p) => [p.lat, p.lng]));
-        setElevationProfile(result.elevationProfile);
-        setStats({
-          distanceM: result.distanceM,
-          ascentM: result.ascentM,
-          descentM: result.descentM,
-          durationEstimateMin: estimateHikingMinutes(result.distanceM, result.ascentM, result.descentM),
+        // Alternative-route comparison (e.g. trail-preferring vs direct) only
+        // makes sense for a plain start->end request — ORS has no concept of
+        // "alternatives" once via-points are involved.
+        const profiles: RouteProfile[] = waypoints.length === 2 ? ["foot-hiking", "foot-walking"] : ["foot-hiking"];
+        const results = await Promise.allSettled(profiles.map((p) => fetchHikingRoute(waypoints, p)));
+
+        const options: RouteOption[] = [];
+        results.forEach((r, i) => {
+          if (r.status === "fulfilled") {
+            options.push({
+              profile: profiles[i],
+              label: PROFILE_LABELS[profiles[i]],
+              geometry: r.value.geometry.map((p) => [p.lat, p.lng]),
+              elevationProfile: r.value.elevationProfile,
+              stats: {
+                distanceM: r.value.distanceM,
+                ascentM: r.value.ascentM,
+                descentM: r.value.descentM,
+                durationEstimateMin: estimateHikingMinutes(r.value.distanceM, r.value.ascentM, r.value.descentM),
+              },
+            });
+          }
         });
-      } catch (err) {
-        const message = err instanceof RoutingError ? err.message : "Route konnte nicht berechnet werden.";
-        setRoutingError(message);
+
+        if (options.length === 0) {
+          const firstError = results.find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
+          const message =
+            firstError?.reason instanceof RoutingError
+              ? firstError.reason.message
+              : "Route konnte nicht berechnet werden.";
+          setRoutingError(message);
+          setRouteOptions([]);
+          return;
+        }
+
+        // de-duplicate near-identical routes (e.g. both profiles pick the same path)
+        const seen = new Set<string>();
+        const deduped = options.filter((o) => {
+          const sig = routeSignature(o);
+          if (seen.has(sig)) return false;
+          seen.add(sig);
+          return true;
+        });
+
+        setRouteOptions(deduped);
+        setActiveRouteIndex(0);
+      } catch {
+        setRoutingError("Route konnte nicht berechnet werden.");
+        setRouteOptions([]);
       } finally {
         setRoutingLoading(false);
       }
@@ -99,10 +150,18 @@ export default function App() {
   const onSavePlan = useCallback((plan: PlannedHike) => savePlan(plan), [savePlan]);
   const onLoadPlan = useCallback((plan: PlannedHike) => {
     setWaypoints(plan.waypoints);
-    setGeometry(plan.geometry);
-    setElevationProfile(plan.elevationProfile);
-    setStats(plan.stats);
+    setRouteOptions([
+      {
+        profile: "foot-hiking",
+        label: "Gespeicherte Route",
+        geometry: plan.geometry,
+        elevationProfile: plan.elevationProfile,
+        stats: plan.stats,
+      },
+    ]);
+    setActiveRouteIndex(0);
     setRoutingError(null);
+    setFlyToRouteSignal((s) => s + 1);
   }, []);
 
   return (
@@ -123,6 +182,9 @@ export default function App() {
           geometry,
           elevationProfile,
           stats,
+          routeOptions,
+          activeRouteIndex,
+          onSelectRouteOption: setActiveRouteIndex,
           loading: routingLoading,
           error: routingError,
           onRemoveWaypoint,
@@ -143,6 +205,7 @@ export default function App() {
         onSelectHike={handleSelect}
         waypoints={waypoints}
         routeGeometry={geometry}
+        flyToRouteSignal={flyToRouteSignal}
         hoverElevationPoint={hoverElevationPoint}
         onAddWaypoint={onAddWaypoint}
         onInsertWaypoint={onInsertWaypoint}

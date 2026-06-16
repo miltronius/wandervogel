@@ -4,7 +4,12 @@
  * (vite.config.ts, local `npm run dev`) so the ORS key never reaches the
  * browser in either environment.
  */
-const ORS_URL = "https://api.openrouteservice.org/v2/directions/foot-hiking/geojson";
+const ORS_BASE_URL = "https://api.openrouteservice.org/v2/directions";
+
+// Allowlist: prevents the client-supplied `profile` field from being used to
+// hit arbitrary ORS endpoints through this proxy.
+const ALLOWED_PROFILES = new Set(["foot-hiking", "foot-walking"]);
+const DEFAULT_PROFILE = "foot-hiking";
 
 export interface ProxyResult {
   status: number;
@@ -19,13 +24,16 @@ export async function proxyOrsRequest(apiKey: string | undefined, requestBody: u
     };
   }
 
-  const res = await fetch(ORS_URL, {
+  const { profile, ...orsBody } = (requestBody ?? {}) as { profile?: string } & Record<string, unknown>;
+  const resolvedProfile = profile && ALLOWED_PROFILES.has(profile) ? profile : DEFAULT_PROFILE;
+
+  const res = await fetch(`${ORS_BASE_URL}/${resolvedProfile}/geojson`, {
     method: "POST",
     headers: {
       Authorization: apiKey,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(requestBody),
+    body: JSON.stringify(orsBody),
   });
 
   const body = await res.json().catch(() => ({ error: { message: "Ungültige Antwort von OpenRouteService." } }));
